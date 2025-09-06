@@ -3,10 +3,12 @@ name: Build Android APK
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-22.04
+
     steps:
       - uses: actions/checkout@v4
 
@@ -14,13 +16,22 @@ jobs:
         with:
           node-version: '18'
 
+      # Viktig: Gradle 8.x + cordova-android krever Java 17
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
       - name: Install Cordova
         run: npm i -g cordova@12
 
+      # Installer Android SDK (cmdline-tools) – la action hente siste stabile
       - name: Install Android SDK
         uses: android-actions/setup-android@v3
         with:
-          cmdline-tools-version: 11076708
+          cmdline-tools-version: latest
 
       - name: Accept licenses & install tools
         run: |
@@ -34,6 +45,8 @@ jobs:
         run: npx cordova platform add android
 
       - name: Build debug APK
+        env:
+          GRADLE_OPTS: "-Dorg.gradle.caching=false -Dkotlin.daemon.jvm.options=-Xmx2g"
         run: npm run build
 
       - name: Upload APK
