@@ -1,0 +1,1 @@
+{"root":["./src/App.tsx","./src/main.tsx","./src/registerSW.ts","./src/lib/ws.ts","./src/pages/Home.tsx","./src/pages/Messages.tsx","./src/pages/Tips.tsx","./src/pages/Voice.tsx"],"errors":true,"version":"5.9.2"}

@@ -1,0 +1,38 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Geofence Live</title>
+<style>
+  body { font:16px system-ui, sans-serif; background:#0b0f14; color:#e7ffe7; margin:20px; }
+  button { padding:10px 14px; margin-right:8px; border-radius:10px; border:1px solid #2dd36f; background:#122018; color:#d6ffe0; }
+  #status { margin:12px 0; }
+  pre { background:#0c141a; border:1px solid #264; padding:12px; border-radius:10px; max-height:55vh; overflow:auto; }
+  .pill { display:inline-block; padding:2px 10px; border-radius:999px; border:1px solid #2dd36f; margin-left:6px; }
+</style>
+<h1>Geofence Live</h1>
+<div>
+  <button id="btnStart">Start geofence</button>
+  <button id="btnStop">Stopp geofence</button>
+  <span id="status"></span>
+</div>
+<div id="last" style="margin:10px 0 6px 0;"></div>
+<pre id="log">Ingen data enn</pre>
+<script>
+const $ = (id)=>document.getElementById(id);
+let timer=null;
+async function api(p){ const r=await fetch('http://127.0.0.1:8080'+p); if(!r.ok) throw new Error(r.status); return r.json().catch(()=>({})); }
+async function start(){ $("status").textContent="Starter"; try{ await api("/api/geofence/start"); $("status").textContent="Startet "; poll(true);}catch(e){$("status").textContent="Feil ved start ";} }
+async function stop(){ $("status").textContent="Stopper"; clearInterval(timer); timer=null; try{ await api("/api/geofence/stop"); $("status").textContent="Stoppet "; }catch(e){$("status").textContent="Feil ved stopp ";} }
+async function fetchLog(){
+  try{
+    const data=await api("/api/geofence/log");
+    const lines=(data.log||[]).slice(-100);
+    $("log").textContent=lines.join("\n");
+    for(let i=lines.length-1;i>=0;i--){
+      const m=lines[i].match(/Avstand til hjem.*?([0-9.]+)\s*km/i);
+      if(m){ $("last").innerHTML=`Siste mling: <span class="pill">${m[1]} km</span>`; break; }
+    }
+  }catch(e){}
+}
+function poll(immediate=false){ if(immediate) fetchLog(); clearInterval(timer); timer=setInterval(fetchLog,2000); }
+$("btnStart").onclick=start; $("btnStop").onclick=stop; poll(true);
+</script>

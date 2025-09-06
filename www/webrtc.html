@@ -1,0 +1,154 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WebRTC lyd + video</title>
+<style>
+  body{background:#0b0f14;color:#e7ffe7;font:16px system-ui,sans-serif;margin:18px}
+  h1{font-size:32px;margin:0 0 14px}
+  input,button{padding:10px 12px;border-radius:10px;border:1px solid #2dd36f;background:#122018;color:#d6ffe0}
+  button.ghost{background:#0c141a;border-color:#264}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:10px 0}
+  video{width:100%;max-height:46vh;background:#000;border:1px solid #264;border-radius:10px}
+  .badges{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px}
+  .badge{padding:4px 10px;border-radius:999px;border:1px solid #264;background:#0c141a}
+  .ok{border-color:#2dd36f}
+  .warn{border-color:#d7c600}
+  .err{border-color:#ff5b5b}
+  pre{background:#0c141a;border:1px solid #264;padding:10px;border-radius:10px;max-height:30vh;overflow:auto}
+</style>
+
+<h1>WebRTC lyd + video</h1>
+
+<div class="row">
+  <input id="room" value="test" style="min-width:180px">
+  <button id="join">Join</button>
+  <button id="call">Start call</button>
+  <button id="hang" class="ghost">Hang up</button>
+</div>
+
+<div class="badges">
+  <span id="sig"   class="badge">Signal: …</span>
+  <span id="pc"    class="badge">PC: …</span>
+  <span id="ice"   class="badge">ICE: …</span>
+  <span id="dc"    class="badge">DC: …</span>
+  <span id="rem"   class="badge">Fjern: …</span>
+</div>
+
+<div class="row"><div style="flex:1">
+  <div>Lokalt</div>
+  <video id="local" playsinline autoplay muted></video>
+</div><div style="flex:1">
+  <div>Fjern</div>
+  <video id="remote" playsinline autoplay></video>
+</div></div>
+
+<pre id="log">Klar… Åpne siden i TO faner/enheter med samme rom.</pre>
+
+<script>
+const $ = id => document.getElementById(id);
+const log = (...a)=>{ const l=$('log'); l.textContent += "\n"+a.join(' '); l.scrollTop=l.scrollHeight; };
+
+let ws, pc, dc, localStream;
+let room = $('room').value;
+
+function setBadge(el, text, cls){ el.className='badge '+(cls||''); el.textContent=text; }
+const bSig=$('sig'), bPC=$('pc'), bICE=$('ice'), bDC=$('dc'), bREM=$('rem');
+
+function wsConnect(){
+  try{
+    ws = new WebSocket('ws://127.0.0.1:8765');
+    ws.onopen    = ()=>{ setBadge(bSig,'Signal: OK','ok'); log('Signal OK'); };
+    ws.onclose   = ()=>{ setBadge(bSig,'Signal: Lukket','warn'); };
+    ws.onerror   = e =>{ setBadge(bSig,'Signal: Feil','err'); log('WS error', e.message||e); };
+    ws.onmessage = async ev=>{
+      let m; try{ m=JSON.parse(ev.data) }catch{ return }
+      if(m.room!==room || !pc) return;
+      if(m.type==='offer'){
+        await ensurePC();
+        await pc.setRemoteDescription(m.payload);
+        const ans = await pc.createAnswer();
+        await pc.setLocalDescription(ans);
+        ws.send(JSON.stringify({type:'answer',room,payload:ans}));
+        log('> answer sent');
+      }else if(m.type==='answer'){
+        if(pc.signalingState!=='stable') await pc.setRemoteDescription(m.payload);
+        log('< answer applied');
+      }else if(m.type==='ice'){
+        try{ await pc.addIceCandidate(m.payload) }catch{}
+      }
+    };
+  }catch(e){ setBadge(bSig,'Signal: Feil','err'); log('WS init error', e); }
+}
+
+async function ensurePC(){
+  if(pc) return pc;
+  pc = new RTCPeerConnection({iceServers:[]});
+  setBadge(bPC,'PC: oppretter','warn');
+
+  pc.onconnectionstatechange = ()=>{
+    setBadge(bPC,'PC: '+pc.connectionState, pc.connectionState==='connected'?'ok':
+                       pc.connectionState==='failed'?'err':'warn');
+  };
+  pc.oniceconnectionstatechange = ()=>{
+    setBadge(bICE,'ICE: '+pc.iceConnectionState,
+      /connected|completed/.test(pc.iceConnectionState)?'ok':
+      pc.iceConnectionState==='failed'?'err':'warn');
+  };
+  pc.onicecandidate = e=>{
+    if(e.candidate) ws?.send(JSON.stringify({type:'ice',room,payload:e.candidate}));
+  };
+  pc.ontrack = e=>{
+    $('remote').srcObject = e.streams[0];
+    setBadge(bREM,'Fjern: mottatt ✓','ok');
+  };
+
+  // Media
+  try{
+    localStream = await navigator.mediaDevices.getUserMedia({audio:true, video:true});
+    $('local').srcObject = localStream;
+    localStream.getTracks().forEach(t=>pc.addTrack(t, localStream));
+    log('Lokal media OK');
+  }catch(e){
+    log('getUserMedia feil', e);
+  }
+
+  // DataChannel (for enkel «lever»-sjekk)
+  dc = pc.createDataChannel('ping');
+  dc.onopen  = ()=>{ setBadge(bDC,'DC: OPEN','ok'); };
+  dc.onclose = ()=>{ setBadge(bDC,'DC: CLOSED','warn'); };
+  dc.onerror = ()=>{ setBadge(bDC,'DC: FEIL','err'); };
+
+  return pc;
+}
+
+$('join').onclick = ()=>{
+  room = $('room').value.trim()||'test';
+  setBadge(bSig,'Signal: kobler…','warn');
+  wsConnect();
+};
+
+$('call').onclick = async ()=>{
+  await ensurePC();
+  // «Polite» start: bare start offer når signalingState er 'stable'
+  if(pc.signalingState==='stable'){
+    const off = await pc.createOffer();
+    await pc.setLocalDescription(off);
+    ws?.send(JSON.stringify({type:'offer', room, payload:off}));
+    log('> offer sent');
+  }else{
+    log('Hopper over offer (ikke stable).');
+  }
+};
+
+$('hang').onclick = ()=>{
+  try{ dc?.close(); }catch{}
+  try{ pc?.close(); }catch{}
+  pc = null; dc = null;
+  setBadge(bPC,'PC: closed','warn'); setBadge(bICE,'ICE: —',''); setBadge(bDC,'DC: —','');
+  setBadge(bREM,'Fjern: —','');
+};
+
+setBadge(bSig,'Signal: —',''); setBadge(bPC,'PC: —',''); setBadge(bICE,'ICE: —','');
+setBadge(bDC,'DC: —',''); setBadge(bREM,'Fjern: —','');
+<script id="autoplayFix">const r=document.getElementById("remote"),l=document.getElementById("local");function tp(v){if(!v)return;v.muted=true;v.autoplay=true;v.playsInline=true;let p;try{p=v.play()}catch(e){} if(p&&p.catch)p.catch(()=>{});}["loadedmetadata","canplay","canplaythrough"].forEach(ev=>{r&&r.addEventListener(ev,()=>tp(r));l&&l.addEventListener(ev,()=>tp(l));});let n=0;const t=setInterval(()=>{tp(r);tp(l);if(++n>20)clearInterval(t)},300);</script>
+</script>

@@ -1,0 +1,14 @@
+{
+  "name": "ravn",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "prepare": "cordova prepare android",
+    "build": "cordova build android --no-telemetry --no-interactive --verbose"
+  },
+  "devDependencies": {
+    "cordova": "^12.0.0",
+    "cordova-android": "^14.0.1",
+    "cordova-plugin-whitelist": "^1.3.5"
+  }
+}
