@@ -21,6 +21,7 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
+cache: 'none'
           check-latest: true
           cache: 'none'
 
