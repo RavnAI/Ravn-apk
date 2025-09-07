@@ -1,16 +1,4 @@
-{
-  "name": "ravn",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "prepare": "cordova prepare android",
-    "build": "cordova build android --no-telemetry --no-interactive --verbose"
-  },
-  "devDependencies": {
-    "cordova": "^6.1.1",
-    "cordova-android": "^14.0.1"
-  },
-  "cordova": {
-    "plugins": {}
-  }
+"scripts": {
+  "start": "vite",
+  "build": "vite build"
 }
