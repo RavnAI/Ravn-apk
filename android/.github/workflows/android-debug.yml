@@ -1,4 +1,4 @@
-name: Build Capacitor Android (Debug)
+name: Build Android (Capacitor Debug)
 
 on:
   workflow_dispatch:
@@ -6,24 +6,37 @@ on:
     paths:
       - "package.json"
       - "package-lock.json"
+      - "capacitor.config.*"
       - "www/**"
-      - "capacitor.config.json"
+      - "android/**"
       - ".github/workflows/android-debug.yml"
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      NODE_ENV: production
+      CAPACITOR_SKIP_ASK: true
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Use Node 18
         uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: 18
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
+
+      # Hvis du bygger web med et rammeverk, kjør build her:
+      # - name: Build web
+      #   run: npm run build
+
+      - name: Capacitor sync android
+        run: npx cap sync android
 
       - name: Setup JDK 17
         uses: actions/setup-java@v4
@@ -34,19 +47,12 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Accept Android SDK licenses
+      - name: Accept SDK licenses
         run: yes | sdkmanager --licenses
 
-      - name: Add Android platform (Capacitor)
-        run: npx cap add android
-
-      - name: Sync web -> native
-        run: npx cap sync android
-
-      - name: Build debug APK
-        run: |
-          cd android
-          ./gradlew assembleDebug
+      - name: Assemble debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
