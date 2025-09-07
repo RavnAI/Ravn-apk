@@ -1,0 +1,10 @@
+platforms/
+plugins/
+node_modules/
+build/
+dist/
+www/**/*.map
+build.json
+.keystore
+*.keystore
+*.jks

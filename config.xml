@@ -1,26 +1,41 @@
 <?xml version='1.0' encoding='utf-8'?>
-<widget id="com.norvegen.ravn" version="0.1.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
+<widget id="com.norvegen.ravn" version="0.1.0"
+  xmlns="http://www.w3.org/ns/widgets"
+  xmlns:cdv="http://cordova.apache.org/ns/1.0"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+
   <name>Ravn</name>
   <description>Offline-first meldinger, tale og video (WebRTC) + SMS/Call fallback.</description>
-  <preference name="AndroidXEnabled" value="true"/>
-  <preference name="AndroidWindowSplashScreenAnimatedIcon" value="res/screen/android/splash.png" />
-  <preference name="SplashMaintainAspectRatio" value="true"/>
-  <preference name="ShowSplashScreenSpinner" value="false"/>
-  <preference name="SplashScreenDelay" value="0"/>
-  <preference name="AutoHideSplashScreen" value="true"/>
-  <preference name="WKWebViewOnly" value="true"/>
-  <preference name="AndroidInsecureFileModeEnabled" value="true"/>
+
+  <!-- Startfil og tilgang -->
+  <content src="index.html" />
+  <access origin="*" />
+  <allow-navigation href="*" />
   <allow-intent href="tel:*" />
   <allow-intent href="sms:*" />
-  <allow-navigation href="*" />
+
+  <!-- Preferanser -->
+  <preference name="loglevel" value="DEBUG" />
+  <preference name="AndroidXEnabled" value="true" />
+  <preference name="WKWebViewOnly" value="true" />
+  <preference name="AndroidInsecureFileModeEnabled" value="true" />
+  <preference name="android-targetSdkVersion" value="35" />
+
+  <!-- Splash (valgfritt – beholdt slik du hadde) -->
+  <preference name="AndroidWindowSplashScreenAnimatedIcon" value="res/screen/android/splash.png" />
+  <preference name="SplashMaintainAspectRatio" value="true" />
+  <preference name="ShowSplashScreenSpinner" value="false" />
+  <preference name="SplashScreenDelay" value="0" />
+  <preference name="AutoHideSplashScreen" value="true" />
+
+  <!-- KUN Android-spesifikt: legg permissions i AndroidManifest via edit-config -->
   <platform name="android">
-    <preference name="android-targetSdkVersion" value="35" />
-    <edit-config file="AndroidManifest.xml" mode="merge" target="/manifest/uses-permission">
+    <edit-config file="AndroidManifest.xml" mode="merge" target="/manifest">
+      <uses-permission android:name="android.permission.INTERNET" />
+      <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
       <uses-permission android:name="android.permission.CAMERA" />
-    </edit-config>
-    <edit-config file="AndroidManifest.xml" mode="merge" target="/manifest/uses-permission">
       <uses-permission android:name="android.permission.RECORD_AUDIO" />
     </edit-config>
   </platform>
-  <plugin name="cordova-plugin-whitelist" spec="1.3.5" />
+
 </widget>
