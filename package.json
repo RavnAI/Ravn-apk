@@ -1,16 +1,10 @@
 {
-  "name": "ravn",
+  "name": "ravn-apk",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "echo \"no web build step\"",
-    "postinstall": "echo \"deps installed\""
-  },
-  "dependencies": {
-    "@capacitor/core": "^6.0.0"
-  },
-  "devDependencies": {
-    "@capacitor/cli": "^6.0.0",
-    "@capacitor/android": "^6.0.0"
+    "start": "echo \"Static PWA in /www (no dev server)\"",
+    "build": "echo \"No build step for static PWA\"",
+    "preview": "echo \"Open GitHub Pages once deployed\""
   }
 }

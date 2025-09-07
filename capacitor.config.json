@@ -1,0 +1,13 @@
+{
+  "appId": "com.ravnai.app",
+  "appName": "RavnAI",
+  "webDir": "www",
+  "cordova": {
+    "preferences": {
+      "AndroidXEnabled": "true",
+      "WkWebViewOnly": "true",
+      "AutoHideSplashScreen": "true",
+      "SplashScreenDelay": "0"
+    }
+  }
+}

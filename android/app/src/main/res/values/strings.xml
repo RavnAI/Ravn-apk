@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">RavnAI</string>
+    <string name="title_activity_main">RavnAI</string>
+    <string name="package_name">com.ravnai.app</string>
+    <string name="custom_url_scheme">com.ravnai.app</string>
+</resources>

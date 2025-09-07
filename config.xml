@@ -1,41 +1,28 @@
 <?xml version='1.0' encoding='utf-8'?>
 <widget id="com.norvegen.ravn" version="0.1.0"
-  xmlns="http://www.w3.org/ns/widgets"
-  xmlns:cdv="http://cordova.apache.org/ns/1.0"
-  xmlns:android="http://schemas.android.com/apk/res/android">
+        xmlns="http://www.w3.org/ns/widgets"
+        xmlns:android="http://schemas.android.com/apk/res/android">
 
   <name>Ravn</name>
-  <description>Offline-first meldinger, tale og video (WebRTC) + SMS/Call fallback.</description>
-
-  <!-- Startfil og tilgang -->
+  <description>Offline-first meldinger, tale og video</description>
   <content src="index.html" />
-  <access origin="*" />
+
+  <!-- Enkle, trygge preferanser -->
+  <preference name="AndroidXEnabled" value="true" />
+  <preference name="WkWebViewOnly" value="true" />
+  <preference name="AutoHideSplashScreen" value="true" />
+  <preference name="SplashScreenDelay" value="0" />
+
   <allow-navigation href="*" />
   <allow-intent href="tel:*" />
   <allow-intent href="sms:*" />
 
-  <!-- Preferanser -->
-  <preference name="loglevel" value="DEBUG" />
-  <preference name="AndroidXEnabled" value="true" />
-  <preference name="WKWebViewOnly" value="true" />
-  <preference name="AndroidInsecureFileModeEnabled" value="true" />
-  <preference name="android-targetSdkVersion" value="35" />
-
-  <!-- Splash (valgfritt – beholdt slik du hadde) -->
-  <preference name="AndroidWindowSplashScreenAnimatedIcon" value="res/screen/android/splash.png" />
-  <preference name="SplashMaintainAspectRatio" value="true" />
-  <preference name="ShowSplashScreenSpinner" value="false" />
-  <preference name="SplashScreenDelay" value="0" />
-  <preference name="AutoHideSplashScreen" value="true" />
-
-  <!-- KUN Android-spesifikt: legg permissions i AndroidManifest via edit-config -->
   <platform name="android">
-    <edit-config file="AndroidManifest.xml" mode="merge" target="/manifest">
+    <config-file target="AndroidManifest.xml" parent="/manifest">
       <uses-permission android:name="android.permission.INTERNET" />
-      <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+      <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
       <uses-permission android:name="android.permission.CAMERA" />
       <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    </edit-config>
+    </config-file>
   </platform>
-
 </widget>
