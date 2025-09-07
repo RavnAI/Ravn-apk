@@ -1,0 +1,135 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WebRTC lyd + video</title>
+<style>
+  body{font:16px system-ui, sans-serif;background:#0b0f14;color:#e7ffe7;margin:18px}
+  h1{font-weight:800;letter-spacing:.5px}
+  input,button{padding:10px 14px;border-radius:10px;border:1px solid #2dd36f;background:#122018;color:#d6ffe0}
+  button.ghost{background:#0c141a;border-color:#264}
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
+  .pill{display:inline-block;padding:3px 10px;border-radius:999px;border:1px solid #2dd36f;margin-right:6px}
+  video{width:100%;max-height:38vh;background:#000;border:1px solid #264;border-radius:12px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  pre{background:#0c141a;border:1px solid #264;padding:10px;border-radius:10px;max-height:28vh;overflow:auto}
+  label{opacity:.8;margin-right:6px}
+</style>
+<h1>WebRTC lyd + video</h1>
+
+<div class="row">
+  <label>Rom:</label><input id="room" value="test" style="min-width:160px">
+  <button id="joinBtn">Join</button>
+</div>
+<div class="row">
+  <button id="startBtn">Start call</button>
+  <button id="hangBtn" class="ghost">Hang up</button>
+  <span class="pill" id="sig">Signal: –</span>
+  <span class="pill" id="pc">PC: –</span>
+  <span class="pill" id="ice">ICE: –</span>
+  <span class="pill" id="dc">DC: –</span>
+</div>
+
+<div class="grid">
+  <div>
+    <div style="margin:6px 0">Lokalt</div>
+    <video id="local" autoplay playsinline muted></video>
+  </div>
+  <div>
+    <div style="margin:6px 0">Fjern</div>
+    <video id="remote" autoplay playsinline></video>
+  </div>
+</div>
+
+<pre id="log">Klar… Åpne siden i TO faner/enheter, skriv samme rom, trykk Join på begge, så Start call på én.</pre>
+
+<script>
+const $=id=>document.getElementById(id), log=(...a)=>{ $('log').textContent+='\n'+a.join(' ') };
+const qs=new URLSearchParams(location.search);
+const SIGNAL = qs.get('signal') || 'ws://127.0.0.1:8765';   // overstyr med ?signal=wss://din.tunnel:8765
+$('sig').textContent='Signal: ' + SIGNAL.replace(/^wss?:\/\//,'');
+let ws=null, pc=null, dc=null, room=''; let joined=false; let localStream=null;
+
+function pill(id,txt){ $(id).textContent=txt }
+
+function openWS(){
+  if(ws && ws.readyState===WebSocket.OPEN){ if(joined && room) ws.send(JSON.stringify({type:'join',room})); return; }
+  ws = new WebSocket(SIGNAL);
+  ws.onopen = ()=>{ $('sig').textContent='Signal: OK'; if(joined && room) ws.send(JSON.stringify({type:'join',room})); };
+  ws.onclose = ()=>{ $('sig').textContent='Signal: lukket'; };
+  ws.onmessage = async ev=>{
+    const m = JSON.parse(ev.data||'{}');
+    if(m.type==='hello') return;
+    if(m.type==='offer'){
+      await ensurePC(true);                               // true => legg til recvonly om vi ikke har lokalt media
+      await pc.setRemoteDescription(m.payload);
+      const ans=await pc.createAnswer();
+      await pc.setLocalDescription(ans);
+      ws.send(JSON.stringify({type:'answer', room, payload:ans}));
+      log('< answer sent');
+    }else if(m.type==='answer'){
+      await ensurePC(false);
+      await pc.setRemoteDescription(m.payload);
+      log('< answer received');
+    }else if(m.type==='ice'){
+      try{ await pc.addIceCandidate(m.payload); }catch{}
+    }
+  };
+}
+
+async function ensurePC(wantRecvOnly){
+  if(pc) return;
+  pc = new RTCPeerConnection({iceServers:[]});
+  pc.onconnectionstatechange = ()=> pill('pc','PC: '+pc.connectionState);
+  pc.oniceconnectionstatechange = ()=> pill('ice','ICE: '+pc.iceConnectionState);
+  pc.onicecandidate = e => { if(e.candidate && ws && joined) ws.send(JSON.stringify({type:'ice', room, payload:e.candidate})); };
+  pc.ontrack = e => { $('remote').srcObject = e.streams[0]; };
+
+  // DataChannel (valgfritt / for chat)
+  dc = pc.createDataChannel('chat');
+  dc.onopen = ()=> pill('dc','DC: open');
+  dc.onclose = ()=> pill('dc','DC: closed');
+
+  // Hvis vi er “mottaker” uten lokalt media, sørg for at vi kan motta:
+  if(wantRecvOnly){
+    try{
+      pc.addTransceiver('video', {direction:'recvonly'});
+      pc.addTransceiver('audio', {direction:'recvonly'});
+    }catch{}
+  }
+}
+
+async function join(){
+  room = $('room').value.trim() || 'test';
+  joined = true;
+  openWS();
+  if(ws && ws.readyState===WebSocket.OPEN) ws.send(JSON.stringify({type:'join',room}));
+  log('Joined room', room);
+}
+
+async function startCall(){
+  try{
+    await ensurePC(false); openWS();
+    localStream = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
+    $('local').srcObject = localStream;
+    localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+    if(pc.signalingState==='stable'){
+      const off=await pc.createOffer();
+      await pc.setLocalDescription(off);
+      ws.send(JSON.stringify({type:'offer', room, payload:off}));
+      log('> offer sent');
+    }
+  }catch(e){ log('FEIL:', e); }
+}
+
+function hangup(){
+  if(pc){ pc.getSenders().forEach(s=>{try{s.track&&s.track.stop()}catch{}}); pc.close(); pc=null; }
+  if(localStream){ localStream.getTracks().forEach(t=>t.stop()); localStream=null; $('local').srcObject=null; }
+  pill('pc','PC: –'); pill('ice','ICE: –'); pill('dc','DC: –');
+}
+
+$('joinBtn').onclick = join;
+$('startBtn').onclick = startCall;
+$('hangBtn').onclick  = hangup;
+
+// auto-join via URL
+if(qs.get('room')) { $('room').value = qs.get('room'); }
+if(qs.get('autojoin')==='1'){ join(); }
+</script>

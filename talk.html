@@ -1,0 +1,104 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WebRTC lyd + video</title>
+<style>
+  body{background:#0b0f14;color:#e7ffe7;font:16px system-ui,sans-serif;margin:14px}
+  h1{font-size:32px;margin:6px 0 12px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
+  input,button{padding:10px 14px;border-radius:12px;border:1px solid #2dd36f;background:#122018;color:#d6ffe0}
+  .pill{display:inline-block;border:1px solid #2dd36f;border-radius:999px;padding:4px 10px;margin-right:8px}
+  video{width:100%;max-height:38vh;background:#000;border:1px solid #264;border-radius:12px}
+  .col{flex:1 1 360px}
+  pre{background:#0c141a;border:1px solid #264;padding:10px;border-radius:12px;min-height:60px}
+</style>
+<h1>WebRTC lyd + video</h1>
+<div class="row">
+  <input id="room" value="test" style="min-width:180px">
+  <button id="joinBtn">Join</button>
+</div>
+<div class="row">
+  <button id="startBtn">Start call</button>
+  <button id="hangBtn">Hang up</button>
+  <span class="pill" id="sig">Signal: –</span>
+  <span class="pill" id="pcst">PC: –</span>
+  <span class="pill" id="icest">ICE: –</span>
+  <span class="pill" id="dcst">DC: –</span>
+</div>
+<div class="row">
+  <div class="col"><div>Lokalt</div><video id="local" playsinline muted autoplay></video></div>
+  <div class="col"><div>Fjern</div><video id="remote" playsinline autoplay></video></div>
+</div>
+<pre id="log">Klar… Åpne siden i TO faner/enheter, skriv samme rom, trykk Join på begge. På én enhet: trykk Start call KUN i den ene fanen.</pre>
+<script>
+  const $=id=>document.getElementById(id), log=t=>{ const p=$('log'); p.textContent+=`\n${t}`; p.scrollTop=p.scrollHeight; };
+  const url=new URL(location.href);
+  const SIGNAL=url.searchParams.get('signal')||`ws://${location.hostname||'127.0.0.1'}:8765`;
+  let ws, pc, dc, localStream;
+
+  function setPill(id,txt){ $(id).textContent=txt; }
+  async function ensureWS(){
+    if(ws && ws.readyState===1) return;
+    ws=new WebSocket(SIGNAL); setPill('sig','Signal: …');
+    ws.onopen=()=>{ setPill('sig','Signal: OK'); };
+    ws.onclose=()=>{ setPill('sig','Signal: —'); };
+    ws.onmessage=async ev=>{
+      const m=JSON.parse(ev.data);
+      if(m.type==='offer'){ await ensurePC(false); await pc.setRemoteDescription(m.payload);
+        const ans=await pc.createAnswer(); await pc.setLocalDescription(ans);
+        ws.send(JSON.stringify({type:'answer', room:room(), payload:ans})); }
+      else if(m.type==='answer'){ if(pc) await pc.setRemoteDescription(m.payload); }
+      else if(m.type==='ice'){ try{ pc && await pc.addIceCandidate(m.payload); }catch{} }
+    };
+  }
+  function room(){ return $('room').value.trim()||'test'; }
+  function join(){ ensureWS().then(()=> ws.send(JSON.stringify({type:'join', room:room()}))); log('Joined room '+room()); }
+  async function startCall(){
+    try{
+      // På én enhet: kall getUserMedia kun i én fane
+      localStream = await navigator.mediaDevices.getUserMedia({audio:true, video:true});
+      $('local').srcObject=localStream;
+      await ensurePC(true);
+      const off=await pc.createOffer(); await pc.setLocalDescription(off);
+      ws.send(JSON.stringify({type:'offer', room:room(), payload:off}));
+      log('> offer sent');
+    }catch(e){ log('getUserMedia feil: '+e); }
+  }
+  async function ensurePC(withTracks){
+    if(pc) return;
+    pc=new RTCPeerConnection({iceServers:[]});
+    setPill('pcst','PC: oppretter');
+    if(withTracks && localStream){
+      localStream.getTracks().forEach(t=>pc.addTrack(t, localStream));
+    }
+    pc.onicecandidate=e=>{ if(e.candidate){ ws && ws.send(JSON.stringify({type:'ice', room:room(), payload:e.candidate})); } };
+    pc.onconnectionstatechange=()=> setPill('pcst','PC: '+pc.connectionState);
+    pc.oniceconnectionstatechange=()=> setPill('icest','ICE: '+pc.iceConnectionState);
+    pc.ondatachannel= e => { dc=e.channel; wireDC(); };
+    pc.ontrack = e => {
+      const rv=$('remote'); rv.srcObject=e.streams[0];
+      // Tving avspilling selv om nettleser krever bruker-gest
+      const play=()=> rv.play().catch(()=>{ rv.muted=true; rv.play().catch(()=>{}); });
+      rv.onloadedmetadata=play; setTimeout(play, 100); setTimeout(play, 800);
+      log('Fjern media mottatt');
+    };
+    try{ dc=pc.createDataChannel('chat'); wireDC(); }catch{}
+  }
+  function wireDC(){
+    if(!dc) return;
+    dc.onopen = ()=> setPill('dcst','DC: open');
+    dc.onclose= ()=> setPill('dcst','DC: closed');
+    dc.onmessage = ev=> log('Peer: '+ev.data);
+  }
+  function hangup(){
+    if(dc){ try{dc.close();}catch{} dc=null; setPill('dcst','DC: —'); }
+    if(pc){ try{pc.close();}catch{} pc=null; setPill('pcst','PC: —'); setPill('icest','ICE: —'); }
+    if(localStream){ localStream.getTracks().forEach(t=>t.stop()); localStream=null; $('local').srcObject=null; }
+    log('Avsluttet');
+  }
+
+  $('joinBtn').onclick = join;
+  $('startBtn').onclick = startCall;
+  $('hangBtn').onclick = hangup;
+
+  // Auto-join ved oppfrisking
+  join();
+</script>

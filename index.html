@@ -1,0 +1,76 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Ravn - Hovedmeny</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  body{font:16px system-ui, sans-serif;background:#0b0f14;color:#e7ffe7;margin:20px}
+  h1{margin:0 0 12px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
+  button,a.btn{padding:10px 14px;border-radius:10px;border:1px solid #2dd36f;background:#122018;color:#d6ffe0;text-decoration:none}
+  .ghost{background:#0c141a;border-color:#264}
+  pre{background:#0c141a;border:1px solid #264;padding:12px;border-radius:10px;max-height:50vh;overflow:auto}
+</style>
+<h1>Ravn - Hovedmeny</h1>
+<div class="row">
+  <button id="gfStart">Start geofence</button>
+  <button id="gfStop" class="ghost">Stopp geofence</button>
+  <a href="geofence.html" class="btn">Geofence Live</a>
+    <button id="tipsBtn" class="ghost">Tips en venn</button>
+  <a href="vid.html" class="btn">Tale (video)</a>
+</div>
+<div class="row">
+  <button id="smsTest">Send test-SMS</button>
+  <button id="callMor" class="ghost">Ring Mor</button>
+  <button id="callKen" class="ghost">Ring Ken</button>
+</div><div class="row">
+  <input id="anyNum" placeholder="+47XXXXXXXX" style="flex:1;min-width:180px;padding:10px;border:1px solid #2dd36f;border-radius:10px;background:#0c141a;color:#d6ffe0">
+  <input id="anyMsg" placeholder="Melding (valgfritt)" style="flex:2;min-width:220px;padding:10px;border:1px solid #264;border-radius:10px;background:#0c141a;color:#d6ffe0">
+  <button id="btnDial">Ring</button>
+  <button id="btnSms" class="ghost">SMS</button>
+  <button id="btnWA" class="ghost">WhatsApp</button>
+</div>
+<h3>Status</h3>
+<pre id="out">Klar.</pre>
+<script>
+const out = document.getElementById('out');
+async function api(path){
+  try{
+    const r = await fetch('http://127.0.0.1:8080'+path);
+    const t = await r.text();
+    out.textContent = "GET " + path + "\nHTTP " + r.status + "\n\n" + t;
+  }catch(e){ out.textContent = "FEIL: " + e; }
+}
+document.getElementById('gfStart').onclick = ()=> api('/api/geofence/start');
+document.getElementById('gfStop').onclick  = ()=> api('/api/geofence/stop');
+document.getElementById('smsTest').onclick = ()=> api('/api/sms_test?to=+4748245751');
+document.getElementById('callMor').onclick = ()=> api('/api/call?to=+4746642008');
+document.getElementById('callKen').onclick = ()=> api('/api/call?to=+4748245751');const anyNum = document.getElementById('anyNum');
+const anyMsg = document.getElementById('anyMsg');
+document.getElementById('btnDial').onclick = ()=>{
+  const n = (anyNum.value||'').trim();
+  if(!n) return out.textContent='FEIL: mangler nummer';
+  location.href = 'tel:'+n;
+};
+document.getElementById('btnSms').onclick = ()=>{
+  const n = (anyNum.value||'').trim();
+  const m = (anyMsg.value||'').trim() || 'Test fra Ravn';
+  if(!n) return out.textContent='FEIL: mangler nummer';
+  api('/api/sms_test?to='+encodeURIComponent(n)+'&msg='+encodeURIComponent(m));
+};
+document.getElementById('btnWA').onclick = ()=>{
+  let n = (anyNum.value||'').trim();
+  const m = (anyMsg.value||'').trim() || 'Hei!';
+  if(!n) return out.textContent='FEIL: mangler nummer';
+  n = n.replace(/^\+/, '').replace(/\s+/g,'');
+  location.href = 'https://wa.me/'+n+'?text='+encodeURIComponent(m);
+};
+  (function(){
+    const btn=document.getElementById("tipsBtn"); if(!btn) return;
+    btn.onclick=async()=>{
+      const signal = "ws://127.0.0.1:8765"; /* bytt til wss://din.tunnel.tld når klart */
+      const url = location.origin + "/webrtc.html?room=test&signal="+encodeURIComponent(signal);
+      const data = {title:"Bli med i Ravn", text:"Åpne denne for å prate i Ravn:", url};
+      try{ if(navigator.share){ await navigator.share(data);} else { prompt("Kopier lenke:", url); } }catch(e){}
+    };
+  })();
+</script>
